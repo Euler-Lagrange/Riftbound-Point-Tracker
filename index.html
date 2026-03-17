@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#09090B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Riftbound">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Riftbound Tracker</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#root{height:100%;background:#09090B;overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue','Segoe UI',Roboto,system-ui,sans-serif;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;color:#F3F4F6}
+button,select{font-family:inherit;-webkit-tap-highlight-color:transparent}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel" data-type="module">
+const {useState,useEffect,useCallback,useRef}=React;
+
+// ── Storage helper (localStorage) ──
+const S={
+  get:k=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},
+  del:k=>{try{localStorage.removeItem(k)}catch(e){}}
+};
+
+const DOM={Fury:"#F43F5E",Calm:"#10B981",Mind:"#6366F1",Body:"#F97316",Chaos:"#A855F7",Order:"#FACC15"};
+
+const LEGENDS=[
+  {id:"kaisa",name:"Kai'Sa",sub:"Daughter of the Void",d:["Fury","Mind"],card:"OGN-247"},
+  {id:"missf",name:"Miss Fortune",sub:"Bounty Hunter",d:["Body","Chaos"],card:"OGN-249"},
+  {id:"jinx",name:"Jinx",sub:"Loose Cannon",d:["Fury","Chaos"],card:"OGN-251"},
+  {id:"darius",name:"Darius",sub:"Hand of Noxus",d:["Fury","Order"],card:"OGN-253"},
+  {id:"ahri",name:"Ahri",sub:"Nine-Tailed Fox",d:["Calm","Mind"],card:"OGN-255"},
+  {id:"leesin",name:"Lee Sin",sub:"The Blind Monk",d:["Calm","Body"],card:"OGN-257"},
+  {id:"yasuo",name:"Yasuo",sub:"The Unforgiven",d:["Calm","Chaos"],card:"OGN-259"},
+  {id:"leona",name:"Leona",sub:"The Radiant Dawn",d:["Body","Order"],card:"OGN-261"},
+  {id:"teemo",name:"Teemo",sub:"Swift Scout",d:["Mind","Chaos"],card:"OGN-263"},
+  {id:"sett",name:"Sett",sub:"The Boss",d:["Fury","Body"],card:"OGN-269"},
+  {id:"viktor",name:"Viktor",sub:"Herald of the Arcane",d:["Mind","Body"],card:"OGN-271"},
+  {id:"volibear",name:"Volibear",sub:"Relentless Storm",d:["Body","Chaos"],card:"OGN-267"},
+  {id:"annie",name:"Annie",sub:"The Dark Child",d:["Fury","Order"],card:"OGS-017"},
+  {id:"masteryi",name:"Master Yi",sub:"Wuju Bladesman",d:["Calm","Body"],card:"OGS-019"},
+  {id:"lux",name:"Lux",sub:"Lady of Luminosity",d:["Mind","Order"],card:"OGS-021"},
+  {id:"garen",name:"Garen",sub:"Might of Demacia",d:["Calm","Order"],card:"OGS-023"},
+  {id:"sivir",name:"Sivir",sub:"Battle Mistress",d:["Fury","Body"],card:"SPF-253"},
+  {id:"azir",name:"Azir",sub:"Emperor of the Sands",d:["Order","Mind"],card:"SPF-255"},
+  {id:"jax",name:"Jax",sub:"Grandmaster at Arms",d:["Body","Order"],card:"SPF-257"},
+  {id:"reksai",name:"Rek'Sai",sub:"The Void Burrower",d:["Fury","Chaos"],card:"SPF-259"},
+  {id:"fiora",name:"Fiora",sub:"The Grand Duelist",d:["Calm","Order"],card:"SPF-261"},
+  {id:"lucian",name:"Lucian",sub:"The Purifier",d:["Mind","Order"],card:"SPF-263"},
+  {id:"ornn",name:"Ornn",sub:"Fire Below the Mountain",d:["Body","Calm"],card:"SPF-265"},
+  {id:"rumble",name:"Rumble",sub:"Mechanized Menace",d:["Fury","Mind"],card:"SPF-267"},
+  {id:"renata",name:"Renata Glasc",sub:"The Chem-Baroness",d:["Mind","Chaos"],card:"SPF-269"},
+  {id:"ekko",name:"Ekko",sub:"Boy Who Shattered Time",d:["Mind","Chaos"],card:"SPF-271"},
+  {id:"aurora",name:"Aurora",sub:"Witch Between Worlds",d:["Calm","Mind"],card:"SPF-273"},
+];
+
+const BFS=[
+  {n:"Altar to Unity",id:"OGN-275"},{n:"Aspirant's Climb",id:"OGN-276"},
+  {n:"Back-Alley Bar",id:"OGN-277"},{n:"Emperor's Dais",id:"OGN-278"},
+  {n:"Forgotten Monument",id:"OGN-279"},{n:"Fortified Position",id:"OGN-280"},
+  {n:"Hall of Legends",id:"OGN-281"},{n:"Hallowed Tomb",id:"OGN-282"},
+  {n:"Marai Spire",id:"OGN-283"},{n:"Minefield",id:"OGN-284"},
+  {n:"Reaver's Row",id:"OGN-285"},{n:"Reckoner's Arena",id:"OGN-286"},
+  {n:"Rockfall Path",id:"OGN-287"},{n:"Seat of Power",id:"OGN-288"},
+  {n:"Sigil of the Storm",id:"OGN-289"},{n:"Startipped Peak",id:"OGN-290"},
+  {n:"Sunken Temple",id:"OGN-291"},{n:"Targon's Peak",id:"OGN-292"},
+  {n:"The Grand Plaza",id:"OGN-293"},{n:"The Papertree",id:"OGN-294"},
+  {n:"The Candlelit Sanctum",id:"OGN-295"},{n:"Void Gate",id:"OGN-296"},
+  {n:"The Arena's Greatest",id:"OGN-297"},{n:"The Dreaming Tree",id:"OGN-298"},
+  {n:"Bandle Tree",id:"SPF-275"},{n:"Forge of the Fluft",id:"SPF-276"},
+  {n:"Grove of the God-Willow",id:"SPF-277"},{n:"Monastery of Hirana",id:"SPF-278"},
+  {n:"Navori Fighting Pit",id:"SPF-279"},{n:"Obelisk of Power",id:"SPF-280"},
+  {n:"Ornn's Forge",id:"SPF-281"},{n:"Power Nexus",id:"SPF-282"},
+  {n:"Ravenbloom Conservatory",id:"SPF-283"},
+];
+
+const MODES={"1v1":{p:2,bfs:2,win:8,label:"1v1",team:false},"3ffa":{p:3,bfs:3,win:8,label:"3-Player FFA",team:false},"4ffa":{p:4,bfs:3,win:8,label:"4-Player FFA",team:false},"2v2":{p:4,bfs:3,win:11,label:"2v2 Teams",team:true}};
+const PC=["#818CF8","#FB7185","#34D399","#FBBF24"];
+const ci=id=>`https://images.scrydex.com/riftbound/${id}/medium`;
+const fmt=s=>{const m=Math.floor(s/60),sec=s%60;return`${m}:${String(sec).padStart(2,"0")}`;};
+const pre=urls=>urls.forEach(u=>{const i=new Image();i.src=u;});
+const gL=id=>id?LEGENDS.find(l=>l.id===id):null;
+const dGrad=leg=>leg?`linear-gradient(135deg,${DOM[leg.d[0]]},${DOM[leg.d[1]]})`:"linear-gradient(135deg,#374151,#4B5563)";
+
+// ── Icons ──
+const ISw=()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" y1="19" x2="19" y2="13"/><line x1="16" y1="16" x2="20" y2="20"/></svg>;
+const ISh=()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>;
+const ITr=()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
+const IUn=()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>;
+const IGe=()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>;
+const IEnd=()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>;
+
+// ── BF Card ──
+function BfCard({bf,players,mode,onCycle,onTapName}){
+  const ctrl=bf.ctrl,owner=bf.owner>=0?players[bf.owner]:null;
+  const oLeg=gL(owner?.legend);
+  const bdr=oLeg?{borderImage:`${dGrad(oLeg)} 1`,borderWidth:2,borderStyle:"solid"}:{border:"1.5px solid rgba(255,255,255,0.06)"};
+  const cn=ctrl===-1?"Neutral":MODES[mode].team?["Blue","Red"][players[ctrl].team]:players[ctrl].name;
+  const cc=ctrl===-1?"#6B7280":PC[players[ctrl].ci];
+  const [ie,sIe]=useState(false);
+  return(
+    <div onClick={onCycle} style={{flex:1,minWidth:0,borderRadius:12,overflow:"hidden",cursor:"pointer",...bdr,background:"#111",transition:"all 0.15s"}}>
+      <div style={{height:70,position:"relative",overflow:"hidden",background:"linear-gradient(145deg,#0c0c14,#1a1a28)"}}>
+        {!ie&&<img src={ci(bf.id)} alt="" onError={()=>sIe(true)} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:0.55}}/>}
+        {ctrl!==-1&&<div style={{position:"absolute",inset:0,background:`${cc}22`,borderBottom:`2.5px solid ${cc}`}}/>}
+        {owner&&<div style={{position:"absolute",top:4,right:5,fontSize:8,fontWeight:600,color:"rgba(255,255,255,0.7)",background:"rgba(0,0,0,0.65)",padding:"2px 6px",borderRadius:4}}>{owner.name}</div>}
+      </div>
+      <div style={{padding:"5px 8px",background:"rgba(255,255,255,0.02)"}}>
+        <div onClick={e=>{e.stopPropagation();onTapName();}} style={{fontSize:10,fontWeight:600,color:"#E5E7EB",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:"pointer"}}>{bf.name}</div>
+        <div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}>
+          <div style={{width:6,height:6,borderRadius:"50%",background:cc,boxShadow:ctrl!==-1?`0 0 6px ${cc}66`:"none"}}/>
+          <span style={{fontSize:9,color:cc,fontWeight:600}}>{cn}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── End Turn Btn ──
+function EndTurnBtn({onClick,disabled,accent}){
+  return <button onClick={onClick} disabled={disabled} style={{width:"100%",padding:"12px",borderRadius:12,background:disabled?"rgba(255,255,255,0.02)":`${accent||"#6366F1"}12`,border:disabled?"1px solid rgba(255,255,255,0.04)":`1px solid ${accent||"#6366F1"}30`,color:disabled?"rgba(255,255,255,0.08)":accent||"#6366F1",fontSize:13,fontWeight:700,cursor:disabled?"default":"pointer",letterSpacing:0.3,transition:"all 0.15s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><IEnd/> End turn</button>;
+}
+
+// ── Player Panel ──
+function PPanel({p,pi,isAct,winScore,onPts,onScore,onName,onLegend,onEndTurn,winner}){
+  const c=PC[p.ci];const leg=gL(p.legend);const [ie,sIe]=useState(false);
+  return(
+    <div style={{padding:"14px 16px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+        {leg&&!ie?<img src={ci(leg.card)} alt="" onError={()=>sIe(true)} style={{width:38,height:52,borderRadius:8,objectFit:"cover",border:`2px solid ${c}44`,flexShrink:0}}/>
+        :<div onClick={onLegend} style={{width:38,height:52,borderRadius:8,background:"rgba(255,255,255,0.03)",border:"1.5px dashed rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:8,color:"rgba(255,255,255,0.15)",textAlign:"center",lineHeight:1.2,flexShrink:0}}>SET<br/>LEGEND</div>}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <span onClick={onName} style={{fontSize:15,fontWeight:800,color:c,cursor:"pointer",letterSpacing:-0.3}}>{p.name}</span>
+            {isAct&&winner<0&&<span style={{fontSize:8,fontWeight:700,color:c,background:`${c}18`,padding:"2px 7px",borderRadius:4,letterSpacing:0.5}}>TURN</span>}
+          </div>
+          {leg?<div onClick={onLegend} style={{cursor:"pointer",marginTop:2}}>
+            <span style={{fontSize:11,color:"#9CA3AF",fontWeight:500}}>{leg.name}<span style={{color:"#6B7280",fontWeight:400}}>, {leg.sub}</span></span>
+            <div style={{display:"flex",gap:4,marginTop:3}}>{leg.d.map(d=><span key={d} style={{fontSize:8,fontWeight:700,color:DOM[d],background:`${DOM[d]}15`,padding:"2px 6px",borderRadius:4}}>{d}</span>)}</div>
+          </div>:<span onClick={onLegend} style={{fontSize:11,color:"rgba(255,255,255,0.1)",cursor:"pointer"}}>Tap to choose legend</span>}
+        </div>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:14,justifyContent:"center",marginBottom:12}}>
+        <button onClick={()=>onPts(-1)} style={{width:44,height:44,borderRadius:"50%",border:`1.5px solid ${c}20`,background:`${c}08`,color:c,fontSize:22,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"transform 0.1s"}}
+          onTouchStart={e=>e.currentTarget.style.transform="scale(0.88)"} onTouchEnd={e=>e.currentTarget.style.transform=""}>−</button>
+        <div onClick={()=>winner<0&&onScore()} style={{textAlign:"center",minWidth:72,cursor:winner<0?"pointer":"default"}}>
+          <div style={{fontSize:52,fontWeight:900,color:"#F9FAFB",lineHeight:1,fontVariantNumeric:"tabular-nums",letterSpacing:-2}}>{p.pts}</div>
+          <div style={{display:"flex",justifyContent:"center",gap:3,marginTop:5}}>
+            {Array.from({length:Math.min(winScore,11)},(_,j)=>
+              <div key={j} style={{width:5,height:5,borderRadius:"50%",background:j<p.pts?c:"rgba(255,255,255,0.06)",boxShadow:j<p.pts?`0 0 4px ${c}55`:"none",transition:"all 0.2s"}}/>
+            )}
+          </div>
+        </div>
+        <button onClick={()=>winner<0&&onScore()} style={{width:44,height:44,borderRadius:"50%",border:`1.5px solid ${c}20`,background:`${c}08`,color:c,fontSize:22,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"transform 0.1s"}}
+          onTouchStart={e=>e.currentTarget.style.transform="scale(0.88)"} onTouchEnd={e=>e.currentTarget.style.transform=""}>+</button>
+      </div>
+      <EndTurnBtn onClick={onEndTurn} disabled={winner>=0} accent={c}/>
+    </div>
+  );
+}
+
+// ═══ MAIN APP ═══
+function App(){
+  const [scr,setScr]=useState("menu");
+  const [mode,setMode]=useState("1v1");
+  const [ps,setPs]=useState([]);
+  const [bfs,setBfs]=useState([]);
+  const [act,setAct]=useState(0);
+  const [turn,setTurn]=useState(1);
+  const [tmr,setTmr]=useState(0);
+  const [tick,setTick]=useState(false);
+  const [win,setWin]=useState(-1);
+  const [undoS,setUndoS]=useState([]);
+  const [log,setLog]=useState([]);
+  const [modal,setModal]=useState(null);
+  const [me,setMe]=useState(()=>S.get("rb-me")||{name:"Me",legend:null});
+  const tr=useRef(null);const logEnd=useRef(null);
+
+  const saveMe=useCallback(prof=>{setMe(prof);S.set("rb-me",prof);},[]);
+
+  useEffect(()=>{if(tick)tr.current=setInterval(()=>setTmr(t=>t+1),1000);else clearInterval(tr.current);return()=>clearInterval(tr.current);},[tick]);
+  useEffect(()=>{logEnd.current?.scrollIntoView({behavior:"smooth"});},[log]);
+  useEffect(()=>{if(scr==="game"&&ps.length)S.set("rb-game",{mode,ps,bfs,act,turn,tmr,win,log});},[scr,ps,bfs,act,turn,tmr,win,log,mode]);
+  useEffect(()=>{const s=S.get("rb-game");if(s?.ps?.length){setMode(s.mode);setPs(s.ps);setBfs(s.bfs);setAct(s.act);setTurn(s.turn);setTmr(s.tmr||0);setWin(s.win);setLog(s.log||[]);setScr("game");}},[]);
+  useEffect(()=>{if(scr==="game"){const u=[];bfs.forEach(b=>u.push(ci(b.id)));ps.forEach(p=>{const l=gL(p.legend);if(l)u.push(ci(l.card));});LEGENDS.forEach(l=>u.push(ci(l.card)));BFS.forEach(b=>u.push(ci(b.id)));pre(u);}},[scr]);
+
+  const snap=useCallback(()=>{setUndoS(u=>[...u.slice(-30),JSON.stringify({ps,bfs,act,turn,win,log})]);},[ps,bfs,act,turn,win,log]);
+  const doUndo=()=>{if(!undoS.length)return;const p=JSON.parse(undoS.at(-1));setPs(p.ps);setBfs(p.bfs);setAct(p.act);setTurn(p.turn);setWin(p.win);setLog(p.log);setUndoS(u=>u.slice(0,-1));};
+
+  const start=m=>{
+    const mc=MODES[m];
+    const players=Array.from({length:mc.p},(_,i)=>{
+      if(mc.p===2&&i===1)return{name:me.name,pts:0,ci:1,legend:me.legend,team:mc.team?0:1};
+      if(mc.team)return{name:i<2?`Blue ${i+1}`:`Red ${i-1}`,pts:0,ci:i,legend:null,team:i<2?0:1};
+      return{name:i===0?"Opponent":`Player ${i+1}`,pts:0,ci:i,legend:null,team:i};
+    });
+    const sh=[...BFS].sort(()=>Math.random()-0.5);
+    const bf=Array.from({length:mc.bfs},(_,i)=>({name:sh[i].n,id:sh[i].id,ctrl:-1,owner:i<mc.p?i:-1}));
+    setMode(m);setPs(players);setBfs(bf);setAct(0);setTurn(1);setTmr(0);setTick(true);setWin(-1);setUndoS([]);setLog([]);setScr("game");
+  };
+  const reset=()=>{setTick(false);setScr("menu");S.del("rb-game");};
+
+  const checkW=nps=>{const mc=MODES[mode];if(mc.team){const ts=[0,0];nps.forEach(p=>ts[p.team]+=p.pts);if(ts[0]>=mc.win)return 0;if(ts[1]>=mc.win)return 2;}else{const w=nps.findIndex(p=>p.pts>=mc.win);if(w>=0)return w;}return-1;};
+  const scorePoint=(pi,type,bfN)=>{if(win>=0)return;snap();const nps=ps.map((p,i)=>i===pi?{...p,pts:p.pts+1}:p);setPs(nps);const w=checkW(nps);if(w>=0)setWin(w);setLog(prev=>[...prev,{player:pi,type,bf:bfN,turn}]);};
+  const adjPts=(pi,d)=>{if(win>=0)return;snap();const nps=ps.map((p,i)=>i===pi?{...p,pts:Math.max(0,Math.min(MODES[mode].win,p.pts+d))}:p);setPs(nps);if(d>0){const w=checkW(nps);if(w>=0)setWin(w);}};
+  const cycleBf=bi=>{if(win>=0)return;snap();setBfs(prev=>prev.map((b,i)=>i===bi?{...b,ctrl:b.ctrl+1>=MODES[mode].p?-1:b.ctrl+1}:b));};
+  const nextTurn=triggeredBy=>{if(win>=0)return;snap();setLog(prev=>[...prev,{player:triggeredBy!==undefined?triggeredBy:act,type:"turn_end",bf:`Turn ${turn} ended`,turn}]);setAct(a=>(a+1)%MODES[mode].p);setTurn(t=>t+1);};
+  const editName=pi=>{const n=prompt("Name:",ps[pi].name);if(!n?.trim())return;setPs(prev=>prev.map((x,i)=>i===pi?{...x,name:n.trim()}:x));if(MODES[mode].p===2&&pi===1)saveMe({...me,name:n.trim()});};
+  const setLeg=(pi,lid)=>{setPs(p=>p.map((x,i)=>i===pi?{...x,legend:lid}:x));if(lid){const l=gL(lid);if(l)pre([ci(l.card)]);}if(MODES[mode].p===2&&pi===1)saveMe({...me,legend:lid});};
+
+  const mc=MODES[mode];const is1v1=mc?.p===2&&!mc?.team;
+
+  // ── MENU ──
+  if(scr==="menu")return(
+    <div style={{maxWidth:420,margin:"0 auto",minHeight:"100vh",paddingBottom:40}}>
+      <div style={{padding:"48px 24px 16px",textAlign:"center"}}>
+        <div style={{fontSize:10,letterSpacing:5,color:"rgba(255,255,255,0.15)",textTransform:"uppercase",fontWeight:600}}>League of Legends TCG</div>
+        <h1 style={{fontSize:38,fontWeight:900,margin:"8px 0 0",background:"linear-gradient(135deg,#818CF8,#A78BFA,#FB7185)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",letterSpacing:-1}}>RIFTBOUND</h1>
+        <p style={{fontSize:13,color:"rgba(255,255,255,0.2)",margin:"4px 0 0",fontWeight:500,letterSpacing:0.5}}>Game companion</p>
+      </div>
+      <div style={{margin:"20px 24px",padding:"14px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:14}}>
+        <div style={{fontSize:9,color:"rgba(255,255,255,0.2)",textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,fontWeight:600}}>Your profile</div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {gL(me.legend)?<img src={ci(gL(me.legend).card)} alt="" style={{width:34,height:48,borderRadius:8,objectFit:"cover",border:"1.5px solid rgba(255,255,255,0.1)"}}/>:<div style={{width:34,height:48,borderRadius:8,background:"rgba(255,255,255,0.03)",border:"1px dashed rgba(255,255,255,0.08)"}}/>}
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:800,color:PC[1],letterSpacing:-0.3}}>{me.name}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",fontWeight:500}}>{gL(me.legend)?.name||"No legend chosen"}</div>
+          </div>
+          <button onClick={()=>{const n=prompt("Your name:",me.name);if(n?.trim())saveMe({...me,name:n.trim()});}} style={{padding:"7px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,color:"rgba(255,255,255,0.4)",cursor:"pointer",fontSize:11,fontWeight:600}}>Edit</button>
+        </div>
+      </div>
+      <div style={{padding:"4px 24px"}}>
+        <div style={{fontSize:9,letterSpacing:2,color:"rgba(255,255,255,0.12)",textTransform:"uppercase",marginBottom:12,fontWeight:600}}>Game mode</div>
+        {Object.entries(MODES).map(([k,v])=>
+          <button key={k} onClick={()=>start(k)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"14px 18px",marginBottom:6,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:12,color:"#F3F4F6",cursor:"pointer",textAlign:"left",transition:"border-color 0.15s"}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(255,255,255,0.12)"} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(255,255,255,0.06)"}>
+            <div><div style={{fontSize:15,fontWeight:700,letterSpacing:-0.2}}>{v.label}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.25)",marginTop:2,fontWeight:500}}>{v.p} players · {v.bfs} battlefields · first to {v.win}{v.team?" (team)":""}</div></div>
+            <span style={{color:"rgba(255,255,255,0.1)",fontSize:20,fontWeight:300}}>›</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── GAME ──
+  const rP=pi=><PPanel p={ps[pi]} pi={pi} isAct={act===pi} winScore={mc.team?6:mc.win} onPts={d=>adjPts(pi,d)} onScore={()=>setModal({type:"score",pi})} onName={()=>editName(pi)} onLegend={()=>setModal({type:"legend",pi})} onEndTurn={()=>nextTurn(pi)} winner={win}/>;
+  const rBfs=()=><div style={{padding:"8px 16px"}}><div style={{display:"flex",gap:8}}>{bfs.map((bf,i)=><BfCard key={i} bf={bf} players={ps} mode={mode} onCycle={()=>cycleBf(i)} onTapName={()=>setModal({type:"bf",bi:i})}/>)}</div></div>;
+
+  return(
+    <div style={{maxWidth:420,margin:"0 auto",minHeight:"100vh",position:"relative",paddingBottom:"env(safe-area-inset-bottom)"}}>
+
+      {/* MODALS */}
+      {modal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}} onClick={()=>setModal(null)}>
+        <div style={{background:"#18181B",borderRadius:16,padding:20,maxWidth:380,width:"100%",border:"1px solid rgba(255,255,255,0.08)",maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          {modal.type==="legend"&&<>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>Choose legend</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
+              {LEGENDS.map(l=>{const sel=ps[modal.pi]?.legend===l.id;return(
+                <button key={l.id} onClick={()=>{setLeg(modal.pi,l.id);setModal(null);}} style={{padding:"8px 10px",background:sel?`${DOM[l.d[0]]}15`:"rgba(255,255,255,0.03)",border:sel?`1.5px solid ${DOM[l.d[0]]}`:"1px solid rgba(255,255,255,0.06)",borderRadius:10,color:"#E5E7EB",cursor:"pointer",textAlign:"left"}}>
+                  <div style={{fontSize:11,fontWeight:700}}>{l.name}</div>
+                  <div style={{fontSize:9,color:"#6B7280",fontWeight:500}}>{l.sub}</div>
+                  <div style={{display:"flex",gap:3,marginTop:3}}>{l.d.map(d=><span key={d} style={{fontSize:8,fontWeight:700,color:DOM[d],background:`${DOM[d]}12`,padding:"1px 5px",borderRadius:4}}>{d}</span>)}</div>
+                </button>
+              );})}
+            </div>
+            <button onClick={()=>{setLeg(modal.pi,null);setModal(null);}} style={{width:"100%",padding:"8px",marginTop:8,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,color:"#6B7280",cursor:"pointer",fontSize:11,fontWeight:600}}>Clear legend</button>
+          </>}
+          {modal.type==="bf"&&<>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>Select battlefield</div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              {BFS.map(b=>
+                <button key={b.id} onClick={()=>{setBfs(prev=>prev.map((bf,i)=>i===modal.bi?{...bf,name:b.n,id:b.id}:bf));pre([ci(b.id)]);setModal(null);}} style={{padding:"9px 12px",textAlign:"left",background:bfs[modal.bi]?.id===b.id?"#6366F115":"rgba(255,255,255,0.03)",border:bfs[modal.bi]?.id===b.id?"1px solid #6366F1":"1px solid rgba(255,255,255,0.04)",borderRadius:10,color:"#E5E7EB",cursor:"pointer",fontSize:12,fontWeight:500}}>{b.n}</button>
+              )}
+            </div>
+          </>}
+          {modal.type==="settings"&&<>
+            <div style={{fontSize:16,fontWeight:800,marginBottom:16}}>Settings</div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.2)",textTransform:"uppercase",letterSpacing:1.5,marginBottom:6,fontWeight:600}}>Players</div>
+            {ps.map((p,i)=><div key={i} style={{display:"flex",gap:5,marginBottom:5}}>
+              <button onClick={()=>editName(i)} style={{flex:1,padding:"9px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,color:PC[p.ci],cursor:"pointer",fontSize:13,textAlign:"left",fontWeight:700}}>{p.name}{is1v1&&i===1?" (you)":""}</button>
+              <button onClick={()=>setModal({type:"legend",pi:i})} style={{padding:"9px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,color:p.legend?"#E5E7EB":"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:11,fontWeight:500}}>{gL(p.legend)?.name||"Legend"}</button>
+            </div>)}
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.2)",textTransform:"uppercase",letterSpacing:1.5,marginTop:14,marginBottom:6,fontWeight:600}}>Battlefields</div>
+            {bfs.map((bf,i)=><div key={i} style={{display:"flex",gap:5,marginBottom:5}}>
+              <button onClick={()=>setModal({type:"bf",bi:i})} style={{flex:1,padding:"9px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,color:"#E5E7EB",cursor:"pointer",fontSize:12,textAlign:"left",fontWeight:500}}>{bf.name}</button>
+              <select value={bf.owner} onChange={e=>{setBfs(prev=>prev.map((b,j)=>j===i?{...b,owner:parseInt(e.target.value)}:b));}} style={{padding:"6px 8px",background:"#18181B",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,color:bf.owner>=0?PC[ps[bf.owner]?.ci]:"rgba(255,255,255,0.15)",fontSize:11}}>
+                <option value={-1}>None</option>
+                {ps.map((p,pi)=><option key={pi} value={pi}>{p.name}</option>)}
+              </select>
+            </div>)}
+            <div style={{display:"flex",gap:8,marginTop:16}}>
+              <button onClick={()=>setModal(null)} style={{flex:1,padding:"11px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,color:"#E5E7EB",cursor:"pointer",fontSize:13,fontWeight:700}}>Done</button>
+              <button onClick={()=>{setModal(null);reset();}} style={{flex:1,padding:"11px",background:"#F43F5E12",border:"1px solid #F43F5E30",borderRadius:12,color:"#FB7185",cursor:"pointer",fontSize:13,fontWeight:700}}>End game</button>
+            </div>
+          </>}
+          {modal.type==="score"&&<>
+            <div style={{fontSize:15,fontWeight:800,marginBottom:4}}>Score point</div>
+            <div style={{fontSize:12,color:"#6B7280",marginBottom:14,fontWeight:500}}>{ps[modal.pi]?.name}</div>
+            {bfs.map((bf,bi)=>
+              <div key={bi} style={{marginBottom:10}}>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.2)",marginBottom:4,fontWeight:700}}>{bf.name}</div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>{scorePoint(modal.pi,"conquer",bf.name);setModal(null);}} style={{flex:1,padding:"11px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,color:"#FBBF24",cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><ISw/> Conquered</button>
+                  <button onClick={()=>{scorePoint(modal.pi,"hold",bf.name);setModal(null);}} style={{flex:1,padding:"11px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,color:"#818CF8",cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><ISh/> Held</button>
+                </div>
+              </div>
+            )}
+            <button onClick={()=>{scorePoint(modal.pi,"ability","Card ability");setModal(null);}} style={{width:"100%",padding:"10px",marginTop:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,color:"#6B7280",cursor:"pointer",fontSize:11,fontWeight:600}}>+ Card ability</button>
+          </>}
+        </div>
+      </div>}
+
+      {/* WIN */}
+      {win>=0&&<div style={{position:"sticky",top:0,zIndex:50,background:"rgba(9,9,11,0.97)",borderBottom:"1px solid #FBBF2433",padding:"12px 18px",textAlign:"center",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+        <div style={{color:"#FBBF24",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><ITr/><span style={{fontSize:18,fontWeight:800}}>{mc.team?`${["Blue","Red"][win]} team wins!`:`${ps[win].name} wins!`}</span></div>
+        <div style={{fontSize:11,color:"#6B7280",marginTop:3,fontWeight:500}}>{turn} turns · {fmt(tmr)}</div>
+        <button onClick={reset} style={{marginTop:8,padding:"7px 22px",background:"#FBBF2415",border:"1px solid #FBBF2440",borderRadius:8,color:"#FBBF24",cursor:"pointer",fontSize:11,fontWeight:700}}>New game</button>
+      </div>}
+
+      {/* HEADER */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 16px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <button onClick={doUndo} disabled={!undoS.length} style={{background:"none",border:"none",color:undoS.length?"#6B7280":"rgba(255,255,255,0.05)",cursor:undoS.length?"pointer":"default",padding:3,display:"flex"}}><IUn/></button>
+          <span style={{fontSize:11,color:"rgba(255,255,255,0.12)",fontVariantNumeric:"tabular-nums",fontWeight:600}}>{fmt(tmr)}</span>
+        </div>
+        <span style={{fontSize:12,fontWeight:800,color:"#9CA3AF"}}>Turn {turn} <span style={{fontWeight:500,color:"rgba(255,255,255,0.15)",fontSize:11}}>· {mc.label}</span></span>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <button onClick={()=>setTick(t=>!t)} style={{background:"none",border:"none",color:tick?"rgba(255,255,255,0.2)":"#FBBF24",cursor:"pointer",fontSize:10,fontWeight:700,padding:3}}>{tick?"⏸":"▶"}</button>
+          <button onClick={()=>setModal({type:"settings"})} style={{background:"none",border:"none",color:"rgba(255,255,255,0.2)",cursor:"pointer",padding:3,display:"flex"}}><IGe/></button>
+        </div>
+      </div>
+
+      {/* LAYOUT */}
+      {is1v1?<>
+        <div style={{transform:"rotate(180deg)",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>{rP(0)}</div>
+        {rBfs()}
+        <div style={{borderTop:"1px solid rgba(255,255,255,0.04)"}}>{rP(1)}</div>
+      </>:<>
+        {ps.map((_,i)=><div key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>{rP(i)}</div>)}
+        {rBfs()}
+      </>}
+
+      {/* LOG */}
+      <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+        <div style={{fontSize:9,letterSpacing:2,color:"rgba(255,255,255,0.1)",textTransform:"uppercase",marginBottom:6,fontWeight:600}}>Game log</div>
+        <div style={{maxHeight:120,overflowY:"auto"}}>
+          {!log.length&&<div style={{fontSize:11,color:"rgba(255,255,255,0.06)",padding:"6px 0",fontWeight:500}}>No events yet</div>}
+          {log.map((e,i)=>{const p=ps[e.player];if(!p)return null;const c=PC[p.ci];const isTurn=e.type==="turn_end";const isCon=e.type==="conquer";return(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.02)",fontSize:11}}>
+              <span style={{color:isTurn?"#6B7280":isCon?"#FBBF24":"#818CF8",display:"flex",flexShrink:0}}>{isTurn?<IEnd/>:isCon?<ISw/>:<ISh/>}</span>
+              <span style={{color:"#6B7280",fontWeight:500}}><span style={{color:c,fontWeight:700}}>{p.name}</span>{isTurn?" ended their turn":isCon?" conquered ":" held "}{!isTurn&&<span style={{color:"#9CA3AF",fontWeight:600}}>{e.bf}</span>}</span>
+              <span style={{marginLeft:"auto",color:"rgba(255,255,255,0.08)",fontSize:9,fontWeight:600,flexShrink:0}}>T{e.turn}</span>
+            </div>
+          );})}
+          <div ref={logEnd}/>
+        </div>
+      </div>
+
+      {/* Disclaimer */}
+      <div style={{padding:"8px 16px 20px",textAlign:"center"}}>
+        <p style={{fontSize:8,color:"rgba(255,255,255,0.06)",lineHeight:1.4}}>Unofficial fan project. Not endorsed by Riot Games. Riftbound™ & League of Legends™ are trademarks of Riot Games, Inc.</p>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+<script>
+// Register service worker
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
